@@ -1241,8 +1241,6 @@ typedef struct AVStream {
      * - muxing: filled by the caller before avformat_write_header()
      */
     AVCodecParameters *codecpar;
-    int64_t last_validate_pts;
-    int64_t last_validate_dts;
 } AVStream;
 
 AVRational av_stream_get_r_frame_rate(const AVStream *s);

@@ -1462,19 +1462,11 @@ static int parse_packet(AVFormatContext *s, AVPacket *pkt, int stream_index)
         if (st->parser->key_frame == -1 && st->parser->pict_type ==AV_PICTURE_TYPE_NONE && (pkt->flags&AV_PKT_FLAG_KEY))
             out_pkt.flags |= AV_PKT_FLAG_KEY;
 	
-	if ((out_pkt.pts == AV_NOPTS_VALUE || out_pkt.dts == AV_NOPTS_VALUE) &&  st->codecpar->codec_id == AV_CODEC_ID_H264){
-	    out_pkt.pts = st->last_validate_pts;
-	    out_pkt.dts = st->last_validate_dts;
-	}
 
         compute_pkt_fields(s, st, st->parser, &out_pkt, next_dts, next_pts);
 
         ret = add_to_pktbuf(&s->internal->parse_queue, &out_pkt,
                             &s->internal->parse_queue_end, 1);
-        if (st->codecpar->codec_id == AV_CODEC_ID_H264) {
-	    st->last_validate_dts = AV_NOPTS_VALUE;
-	    st->last_validate_pts = AV_NOPTS_VALUE;
-	}
 	av_packet_unref(&out_pkt);
         if (ret < 0)
             goto fail;
@@ -1514,7 +1506,6 @@ static int64_t ts_to_samples(AVStream *st, int64_t ts)
 static int read_frame_internal(AVFormatContext *s, AVPacket *pkt)
 {
     int ret = 0, i, got_packet = 0;
-    int64_t initPts = AV_NOPTS_VALUE, initDts = AV_NOPTS_VALUE;
     AVDictionary *metadata = NULL;
 
     av_init_packet(pkt);
@@ -1539,11 +1530,6 @@ static int read_frame_internal(AVFormatContext *s, AVPacket *pkt)
             break;
         }
         
-        st = s->streams[cur_pkt.stream_index];
-	if (st != NULL && (st->last_validate_dts == AV_NOPTS_VALUE || st->last_validate_pts == AV_NOPTS_VALUE)) {
-	    st->last_validate_dts = cur_pkt.dts;
-            st->last_validate_pts = cur_pkt.pts;
-	}
 
         ret = 0;
         st  = s->streams[cur_pkt.stream_index];

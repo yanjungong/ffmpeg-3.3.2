@@ -177,7 +177,13 @@ int av_parser_parse2(AVCodecParserContext *s, AVCodecContext *avctx,
         s->last_dts        = s->dts;
         s->last_pos        = s->pos;
         ff_fetch_timestamp(s, 0, 0, 0);
+    } else {
+        if (avctx->codec_id == AV_CODEC_ID_H264 && (s->dts == AV_NOPTS_VALUE || s->pts == AV_NOPTS_VALUE)){
+            s->pts = pts;
+            s->dts = dts;
+        }
     }
+
     /* WARNING: the returned index can be negative */
     index = s->parser->parser_parse(s, avctx, (const uint8_t **) poutbuf,
                                     poutbuf_size, buf, buf_size);

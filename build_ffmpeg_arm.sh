@@ -35,6 +35,7 @@ function build_arm
 --enable-demuxer=mpegvideo \
 --enable-demuxer=mov \
 --enable-demuxer=hevc \
+--enable-demuxer=eac3 \
 --disable-muxers \
 --enable-muxer=flv \
 --enable-muxer=mpegts \

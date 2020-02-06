@@ -374,7 +374,9 @@ static int mpegts_write_pmt(AVFormatContext *s, MpegTSService *service)
                           : STREAM_TYPE_AUDIO_EAC3;
             break;
         case AV_CODEC_ID_DTS:
-            stream_type = STREAM_TYPE_AUDIO_DTS;
+            stream_type = (ts->flags & MPEGTS_FLAG_SYSTEM_B)
+                          ? STREAM_TYPE_PRIVATE_DATA
+                          : STREAM_TYPE_AUDIO_DTS;
             break;
         case AV_CODEC_ID_TRUEHD:
             stream_type = STREAM_TYPE_AUDIO_TRUEHD;
@@ -405,6 +407,11 @@ static int mpegts_write_pmt(AVFormatContext *s, MpegTSService *service)
             }
             if (st->codecpar->codec_id==AV_CODEC_ID_EAC3 && (ts->flags & MPEGTS_FLAG_SYSTEM_B)) {
                 *q++=0x7a; // EAC3 descriptor see A038 DVB SI
+                *q++=1; // 1 byte, all flags sets to 0
+                *q++=0; // omit all fields...
+            }
+            if (st->codecpar->codec_id==AV_CODEC_ID_DTS && (ts->flags & MPEGTS_FLAG_SYSTEM_B)) {
+                *q++=0x7b; // DTS descriptor see A038 DVB SI
                 *q++=1; // 1 byte, all flags sets to 0
                 *q++=0; // omit all fields...
             }

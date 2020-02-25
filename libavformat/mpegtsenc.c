@@ -106,6 +106,7 @@ typedef struct MpegTSWrite {
 #define MPEGTS_FLAG_PAT_PMT_AT_FRAMES           0x04
 #define MPEGTS_FLAG_SYSTEM_B        0x08
 #define MPEGTS_FLAG_DISCONT         0x10
+#define MPEGTS_FLAG_MPEG_SYSTEM     0x20 //produce MPEG System Ts(no SDT table). else ffmpeg will produce DVB system Ts(have SDT table)
     int flags;
     int copyts;
     int tables_version;
@@ -374,9 +375,7 @@ static int mpegts_write_pmt(AVFormatContext *s, MpegTSService *service)
                           : STREAM_TYPE_AUDIO_EAC3;
             break;
         case AV_CODEC_ID_DTS:
-            stream_type = (ts->flags & MPEGTS_FLAG_SYSTEM_B)
-                          ? STREAM_TYPE_PRIVATE_DATA
-                          : STREAM_TYPE_AUDIO_DTS;
+            stream_type = STREAM_TYPE_PRIVATE_DATA;
             break;
         case AV_CODEC_ID_TRUEHD:
             stream_type = STREAM_TYPE_AUDIO_TRUEHD;
@@ -410,7 +409,7 @@ static int mpegts_write_pmt(AVFormatContext *s, MpegTSService *service)
                 *q++=1; // 1 byte, all flags sets to 0
                 *q++=0; // omit all fields...
             }
-            if (st->codecpar->codec_id==AV_CODEC_ID_DTS && (ts->flags & MPEGTS_FLAG_SYSTEM_B)) {
+            if (st->codecpar->codec_id==AV_CODEC_ID_DTS) {
                 *q++=0x7b; // DTS descriptor see A038 DVB SI
                 *q++=1; // 1 byte, all flags sets to 0
                 *q++=0; // omit all fields...
@@ -698,6 +697,7 @@ static void mpegts_write_sdt(AVFormatContext *s)
         desc_len_ptr = q;
         q++;
         *q++         = ts->service_type;
+	//av_log(s, AV_LOG_ERROR, "write sdt service_type = %d", ts->service_type);
         putstr8(&q, service->provider_name, 1);
         putstr8(&q, service->name, 1);
         desc_len_ptr[0] = q - desc_len_ptr - 1;
@@ -1040,17 +1040,22 @@ static void retransmit_si_info(AVFormatContext *s, int force_pat, int64_t dts)
         (dts != AV_NOPTS_VALUE && dts - ts->last_sdt_ts >= ts->sdt_period*90000.0)
     ) {
         ts->sdt_packet_count = 0;
-        if (dts != AV_NOPTS_VALUE)
+        if (dts != AV_NOPTS_VALUE) {
             ts->last_sdt_ts = FFMAX(dts, ts->last_sdt_ts);
-        mpegts_write_sdt(s);
+	}
+	if (!(ts->flags & MPEGTS_FLAG_MPEG_SYSTEM)) { // if MPEG system ts, will not write sdt table, else DVB system, will write sdt table.
+            mpegts_write_sdt(s);
+        }
     }
+
     if (++ts->pat_packet_count == ts->pat_packet_period ||
         (dts != AV_NOPTS_VALUE && ts->last_pat_ts == AV_NOPTS_VALUE) ||
         (dts != AV_NOPTS_VALUE && dts - ts->last_pat_ts >= ts->pat_period*90000.0) ||
         force_pat) {
         ts->pat_packet_count = 0;
-        if (dts != AV_NOPTS_VALUE)
+        if (dts != AV_NOPTS_VALUE) {
             ts->last_pat_ts = FFMAX(dts, ts->last_pat_ts);
+	}
         mpegts_write_pat(s);
         for (i = 0; i < ts->nb_services; i++)
             mpegts_write_pmt(s, ts->services[i]);
@@ -1940,6 +1945,9 @@ static const AVOption options[] = {
       AV_OPT_FLAG_ENCODING_PARAM, "mpegts_flags" },
     { "initial_discontinuity", "Mark initial packets as discontinuous",
       0, AV_OPT_TYPE_CONST, { .i64 = MPEGTS_FLAG_DISCONT }, 0, INT_MAX,
+      AV_OPT_FLAG_ENCODING_PARAM, "mpegts_flags" },
+    { "mppeg_system_ts", "Produce MPEG System Ts instead of System DVB",
+      0, AV_OPT_TYPE_CONST, { .i64 = MPEGTS_FLAG_MPEG_SYSTEM }, 0, INT_MAX,
       AV_OPT_FLAG_ENCODING_PARAM, "mpegts_flags" },
     // backward compatibility
     { "resend_headers", "Reemit PAT/PMT before writing the next packet",
